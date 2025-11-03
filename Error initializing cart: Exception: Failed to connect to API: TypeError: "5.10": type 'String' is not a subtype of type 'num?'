@@ -1,0 +1,133 @@
+Good — that error tells us exactly what’s wrong.
+
+Root cause: your API is returning the price as a JSON string ("5.10") but your Dart model expects a numeric type (a num?, double?, or int?). When jsonDecode hands you that field as a String, trying to assign it directly to a numeric field throws:
+
+type 'String' is not a subtype of type 'num?'.
+
+You can fix this two ways:
+
+(Best) Fix the server so it returns numbers in JSON (no quotes):
+
+"price": 5.10
+
+
+— JSON numbers map directly to Dart num/double and avoid parsing errors.
+
+(Immediate) Make your Dart model parsing robust so it accepts both num and String values and converts strings to double safely.
+
+Below are safe, ready-to-drop-in snippets you can use.
+
+Robust model fromJson pattern (recommended)
+
+This example shows a Coffee model and a generic safeNum helper that handles num, String, null, and malformed values.
+
+class Coffee {
+  final String id;
+  final String name;
+  final String size;
+  final double? price; // using double for currency
+
+  Coffee({
+    required this.id,
+    required this.name,
+    required this.size,
+    required this.price,
+  });
+
+  factory Coffee.fromJson(Map<String, dynamic> json) {
+    return Coffee(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      size: json['size']?.toString() ?? '',
+      price: _parseDouble(json['price']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'size': size,
+        'price': price,
+      };
+
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      // remove currency symbols/spaces if any, then try parse
+      final cleaned = value.replaceAll(RegExp(r'[^\d\.\-]'), '');
+      return double.tryParse(cleaned);
+    }
+    // unknown type
+    return null;
+  }
+}
+
+
+_parseDouble handles:
+
+JSON numbers (num) → .toDouble()
+
+Strings like "5.10" → double.tryParse("5.10")
+
+Strings with extra characters like "$5.10" → cleans to 5.10
+
+null → null
+
+Use double? if price can be missing; otherwise use double and supply a default.
+
+Example: parsing cart items response safely
+
+If your fetch function decodes a list of items, do something like:
+
+Future<List<Coffee>> fetchCartItems() async {
+  final uri = Uri.parse('$baseUrl/api/cart');
+  final res = await http.get(uri); // add headers if needed
+
+  if (res.statusCode != 200) {
+    throw Exception('Failed to load cart: ${res.statusCode} ${res.body}');
+  }
+
+  final data = jsonDecode(res.body);
+  if (data is! List) throw Exception('Expected a list from API');
+
+  final List<Coffee> items = [];
+  for (final item in data) {
+    try {
+      if (item is Map<String, dynamic>) {
+        items.add(Coffee.fromJson(item));
+      } else if (item is Map) {
+        items.add(Coffee.fromJson(Map<String, dynamic>.from(item)));
+      } else {
+        print('[Cart] skipping unexpected item type: ${item.runtimeType}');
+      }
+    } catch (e, st) {
+      print('[Cart] failed to parse item: $item\nError: $e\n$st');
+      // optionally continue or rethrow depending on desired behaviour
+    }
+  }
+
+  return items;
+}
+
+
+This logs problematic entries instead of crashing your whole cart initialization.
+
+Extra: defensive UI behavior
+
+When displaying price, use a formatter that tolerates nulls:
+
+final priceText = item.price != null ? item.price!.toStringAsFixed(2) : '—';
+
+
+If you expect currency strings from server, normalize them on receipt with _parseDouble.
+
+If you prefer an immediate quick fix
+
+Replace the numeric parsing line in your existing fromJson with:
+
+price: (json['price'] is num) ? (json['price'] as num).toDouble()
+       : double.tryParse(json['price']?.toString() ?? '') ?? 0.0,
+
+
+This returns 0.0 when parsing fails — choose null or throw if you prefer stricter handling.
