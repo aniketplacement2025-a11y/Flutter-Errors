@@ -1,0 +1,101 @@
+Nice — that stack trace is super clear. You're passing a MaterialPageRoute where Flutter expects a route name String. The result: _TypeError: MaterialPageRoute is not a subtype of String.
+
+This almost always happens when you mix up the two Navigator APIs:
+
+Navigator.pushNamed... / pushNamedAndRemoveUntil(context, String routeName, ...) — expects a String route name.
+
+Navigator.push / pushAndRemoveUntil(context, Route, ...) — expects a Route object (for example MaterialPageRoute(...)).
+
+Below are the exact fixes you can apply immediately — pick the one that matches what you want.
+
+1) If you want to use a MaterialPageRoute (direct page push)
+
+Replace the pushNamed... call that currently passes a MaterialPageRoute with pushAndRemoveUntil (or push) that accepts a Route:
+
+Change this (wrong):
+
+// WRONG — calling pushNamed* but passing a MaterialPageRoute
+Navigator.pushNamedAndRemoveUntil(
+  context,
+  MaterialPageRoute(builder: (_) => const CartPage()), // <- wrong type
+  (route) => false,
+);
+
+
+To this (correct):
+
+Navigator.of(context).pushAndRemoveUntil(
+  MaterialPageRoute(builder: (_) => const CartPage()),
+  (route) => false,
+);
+
+
+Or if you only want to push (not remove previous):
+
+Navigator.of(context).push(
+  MaterialPageRoute(builder: (_) => const CartPage()),
+);
+
+2) If you want to use a named route (keep using pushNamed...)
+
+Register /cart in your MaterialApp (or onGenerateRoute) first, then call pushNamedAndRemoveUntil with the string route name:
+
+Add to MaterialApp:
+
+MaterialApp(
+  // ...
+  routes: {
+    '/': (context) => const HomePage(),
+    '/cart': (context) => const CartPage(),
+    // other routes...
+  },
+);
+
+
+Then navigate by name:
+
+Navigator.pushNamedAndRemoveUntil(context, '/cart', (route) => false);
+
+3) If you need to pass arguments to CartPage
+
+Option A — with MaterialPageRoute:
+
+Navigator.of(context).pushAndRemoveUntil(
+  MaterialPageRoute(builder: (_) => CartPage(initialItem: coffee)),
+  (route) => false,
+);
+
+
+Option B — with pushNamed and arguments + onGenerateRoute:
+
+Navigator.pushNamed(context, '/cart', arguments: coffee);
+
+
+Then in onGenerateRoute (or in the receiving page) extract settings.arguments.
+
+What to change in your detail_page.dart _buyNow handler
+
+Replace the incorrect call at line ~75 with one of the correct options above.
+
+Most likely immediate fix (direct route):
+
+// _buyNow() { ... }
+Navigator.of(context).pushAndRemoveUntil(
+  MaterialPageRoute(builder: (_) => const CartPage()),
+  (route) => false,
+);
+
+
+Or if you already defined named routes, use:
+
+Navigator.pushNamedAndRemoveUntil(context, '/cart', (route) => false);
+
+Extra tips
+
+Search your project for other incorrect calls like pushNamedAndRemoveUntil(context, MaterialPageRoute(...), ...) — same bug can appear elsewhere.
+
+Use named routes for large apps or when you want centralized routing. Use MaterialPageRoute for quick local navigation.
+
+If using hot reload, make the fix and perform a full restart if the navigator state feels stale.
+
+If you want, paste the _buyNow function (few lines around it) and I’ll rewrite the exact replacement for you so you can drop it in.
