@@ -1,0 +1,103 @@
+Nice — that stack trace is clear: somewhere in cart_page_body.dart you’re assigning a double (like 5.4) to a variable or field that is typed as String. Dart’s strong typing throws the type 'double' is not a subtype of type 'String' error when that happens.
+Below are exact, safe fixes you can apply immediately plus a few defensive helpers so this never bites you again.
+Quick fixes (pick one)
+
+
+If the variable should be numeric (recommended): make it a double/num instead of String.
+Example: change
+String price;
+
+to
+double price;
+
+and use price.toStringAsFixed(2) when displaying.
+
+
+If the variable should be a string (fast patch): convert the double to string before assigning.
+setState(() {
+  price = (item.price as num).toDouble().toStringAsFixed(2);
+});
+
+
+
+Common places to check (based on your trace)
+
+
+cart_page_body.dart around the handler at line ~449: you likely do setState(() { someStringField = item.price; }). Change to .toString() or .toStringAsFixed(2).
+
+
+Any Map parsing where you assign json['price'] directly into a String typed field.
+
+
+Robust helper functions (drop these in your file)
+Use these so you can accept both String and numeric API responses safely.
+// convert any dynamic price into a double (nullable)
+double? toDouble(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v.toDouble();
+  if (v is String) {
+    final cleaned = v.replaceAll(RegExp(r'[^\d\.\-]'), '');
+    return double.tryParse(cleaned);
+  }
+  return null;
+}
+
+// convert any dynamic price into a formatted string for UI
+String priceString(dynamic v, {int fractionDigits = 2}) {
+  final d = toDouble(v) ?? 0.0;
+  return d.toStringAsFixed(fractionDigits);
+}
+
+Use in setState:
+setState(() {
+  // if your UI field is a String
+  priceText = priceString(item['price']);
+  // or if field is numeric
+  priceValue = toDouble(item['price']) ?? 0.0;
+});
+
+Example: safe fromJson for your Coffee/cart item (defensive)
+If you still have a fromJson, ensure the model stores price as double:
+class Coffee {
+  final String id;
+  final String name;
+  final String size;
+  final double price;
+
+  Coffee({required this.id, required this.name, required this.size, required this.price});
+
+  factory Coffee.fromJson(Map<String,dynamic> json) {
+    double p = 0.0;
+    final raw = json['price'];
+    if (raw is num) {
+      p = raw.toDouble();
+    } else if (raw is String) {
+      p = double.tryParse(raw.replaceAll(RegExp(r'[^\d\.\-]'), '')) ?? 0.0;
+    }
+    return Coffee(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      size: json['size']?.toString() ?? '',
+      price: p,
+    );
+  }
+}
+
+Displaying price in widgets
+Always format when showing:
+Text('₹ ${coffee.price.toStringAsFixed(2)}')
+
+or if you stored price as a String already:
+Text('₹ $priceText')
+
+Why this happened
+
+
+Your server sometimes returns numbers (5.4) and sometimes strings ("5.10"). If your Dart types are inconsistent (sometimes String, sometimes double) you’ll get these runtime type errors.
+
+
+Best practice: keep the model numeric (double) and format for the UI only at render time.
+
+
+
+If you want, paste the small snippet from cart_page_body.dart around lines 440–452 (the setState/update handler) and I’ll rewrite that exact block to be type-safe and to preserve optimistic UI behavior. I can also produce the exact one-line patch if you prefer.
