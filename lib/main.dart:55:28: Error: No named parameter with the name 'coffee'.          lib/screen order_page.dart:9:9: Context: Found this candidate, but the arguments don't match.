@@ -1,0 +1,74 @@
+You're hitting two problems; the first is the actionable Dart compile error, and the second (the InvalidType crash) is likely a follow-on caused by the broken call site. Fixing the compile error will almost certainly remove the compiler crash.
+
+Problem 1 — No named parameter with the name 'coffee'
+
+Your main.dart is calling:
+
+return OrderPage(coffee: args ?? sampleCoffee);
+
+
+but OrderPage's constructor doesn't define a named parameter coffee. You have two ways to fix this:
+
+Option A — Make OrderPage accept a named coffee parameter (recommended if that was the intent)
+Edit lib/screen/order_page.dart and add a field + constructor parameter:
+
+import 'package:flutter/material.dart';
+import '../models/coffee.dart'; // adjust path as needed
+
+class OrderPage extends StatelessWidget {
+  final Coffee coffee; // or Coffee? if nullable
+
+  const OrderPage({
+    Key? key,
+    required this.coffee, // <-- add this
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    // use `coffee` here
+    return Scaffold(
+      appBar: AppBar(title: Text(coffee.name)),
+      body: /* ... */,
+    );
+  }
+}
+
+
+If coffee can be absent, change required this.coffee to this.coffee and make the field final Coffee? coffee; — and guard usages.
+
+Option B — Call OrderPage using a positional argument (if the constructor expects it that way)
+If OrderPage already expects a positional Coffee argument, change the call in main.dart to:
+
+return OrderPage(args ?? sampleCoffee); // positional
+
+
+But Option A is clearer and safer for named-argument code.
+
+Problem 2 — Unsupported invalid type InvalidType(<invalid>) (compiler crash)
+
+This error often appears when the analyzer/compiler can't reconcile an invalid/unknown type at a call site — commonly because of a mismatched constructor invocation (like using a named parameter that doesn't exist), or because an expression inside a map/literal contains a function/closure where a plain value is expected.
+
+Fixing the constructor mismatch above will very likely resolve this. If it doesn't, search for map literals or widget constructors you recently edited that contain something like:
+
+someWidget({ 'key': () { ... } }) // mistakenly using a function as a value in a place that expects a type
+
+
+or check any return statements that build widget trees with map literals. The stacktrace shows the compiler failing while visiting a MapLiteral and a FunctionExpression, which matches the kind of code that triggers this problem.
+
+Quick checklist to resolve now
+
+Open lib/screen/order_page.dart and add the final Coffee coffee; + const OrderPage({Key? key, required this.coffee}) constructor as shown above.
+
+Re-run flutter run / reload. If you still see the compiler crash, paste main.dart around line 50–70 and order_page.dart (the whole file if possible) and I’ll produce an exact patch.
+
+If you used a nullable coffee (Coffee?), make sure every use of coffee checks for null or uses coffee! where safe.
+
+Small extra tips
+
+Keep the Coffee model import path correct in order_page.dart. If you forget the import the type will be unknown and cause errors.
+
+Prefer named parameters for readability in pages that take model objects.
+
+After you add the constructor, if you intended to pass other navigation args, ensure args is typed correctly: final args = ModalRoute.of(context)?.settings.arguments as Coffee?; (or parse accordingly).
+
+If you want, paste the exact OrderPage file or the main.dart snippet around the failing line and I’ll give you the one-click patch to drop in.
