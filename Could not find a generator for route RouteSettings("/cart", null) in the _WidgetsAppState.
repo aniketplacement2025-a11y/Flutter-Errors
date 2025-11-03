@@ -1,0 +1,143 @@
+This error means your app tried to navigate to a named route "/cart" but your root MaterialApp/WidgetsApp doesn’t know how to build that route. Flutter looks for routes in this order:
+
+home for "/"
+
+routes table (exact match)
+
+onGenerateRoute (should return a Route)
+
+onUnknownRoute (fallback if everything else fails)
+
+Your stack shows the navigation originates from detail_page.dart (the _buyNow handler), which calls pushNamedAndRemoveUntil to "/cart". Since "/cart" isn't defined anywhere, Flutter throws.
+
+Below are quick fixes and several safe, copy-paste code options — choose whichever fits your app architecture.
+
+Quick fix — add "/cart" to MaterialApp.routes
+
+Open the file where you create your MaterialApp (usually main.dart) and add a routes entry:
+
+import 'package:flutter/material.dart';
+import 'screen/cart_page.dart';
+import 'screen/home_page.dart';
+import 'screen/order_page.dart';
+
+void main() => runApp(const MyApp());
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Coffee App',
+      debugShowCheckedModeBanner: false,
+      home: const HomePage(),
+      routes: {
+        '/': (context) => const HomePage(),
+        '/cart': (context) => const CartPage(),
+        '/order': (context) => const OrderPage(/* provide default or remove if uses args */),
+        // add other named routes here
+      },
+    );
+  }
+}
+
+
+If OrderPage or CartPage require constructor arguments, either:
+
+make them accept optional/default values, or
+
+register them through onGenerateRoute (see below).
+
+Recommended: use onGenerateRoute when pages need arguments
+
+If you want to pass arguments (like a Coffee object) to routes, implement onGenerateRoute:
+
+MaterialApp(
+  home: const HomePage(),
+  onGenerateRoute: (settings) {
+    switch (settings.name) {
+      case '/cart':
+        return MaterialPageRoute(builder: (_) => const CartPage());
+      case '/order':
+        final args = settings.arguments;
+        if (args is Coffee) {
+          return MaterialPageRoute(builder: (_) => OrderPage(coffee: args));
+        }
+        return MaterialPageRoute(builder: (_) => const OrderPage()); // fallback
+      default:
+        return MaterialPageRoute(builder: (_) => const UnknownPage());
+    }
+  },
+);
+
+
+Then navigate with arguments:
+
+Navigator.of(context).pushNamed('/order', arguments: coffeeInstance);
+
+If you only want to push a page (no named routes required)
+
+Change pushNamedAndRemoveUntil to a direct push using MaterialPageRoute:
+
+// Instead of: Navigator.pushNamedAndRemoveUntil(context, '/cart', (route) => false);
+
+// Do:
+Navigator.of(context).pushAndRemoveUntil(
+  MaterialPageRoute(builder: (ctx) => const CartPage()),
+  (route) => false,
+);
+
+
+Or a simple push:
+
+Navigator.of(context).push(
+  MaterialPageRoute(builder: (ctx) => const CartPage()),
+);
+
+
+Use this if you don't want to maintain a global routes table.
+
+Example: Fixing the _buyNow handler in detail_page.dart
+
+Assuming _buyNow is currently:
+
+Navigator.pushNamedAndRemoveUntil(context, '/cart', (route) => false);
+
+
+Replace with one of these:
+
+A) If you added the named route:
+
+Navigator.pushNamedAndRemoveUntil(context, '/cart', (route) => false);
+
+
+(works once '/cart' is in routes or onGenerateRoute)
+
+B) If you prefer a direct route:
+
+Navigator.of(context).pushAndRemoveUntil(
+  MaterialPageRoute(builder: (_) => const CartPage()),
+  (route) => false,
+);
+
+
+C) If you need to pass an item to cart page:
+
+Navigator.of(context).push(
+  MaterialPageRoute(builder: (_) => CartPage(initialItem: coffee)),
+);
+
+
+(or use pushNamed with arguments: and onGenerateRoute to unpack.)
+
+Helpful checklist to avoid this error again
+
+Add every named route you call to routes or handle it in onGenerateRoute.
+
+When using pushNamed(..., arguments: ...), ensure onGenerateRoute or the receiving page reads settings.arguments and casts safely.
+
+If a page requires arguments, prefer onGenerateRoute to create the page with typed arguments (avoids runtime casting errors).
+
+For simple apps, using routes + named routes is easiest; for argument-heavy navigation, prefer onGenerateRoute.
+
+If you paste the _buyNow function (the code around detail_page.dart line ~68) and your MaterialApp setup (the main.dart where you build MaterialApp), I’ll give you the exact two-line patch to make navigation work (either register the route or change the navigation call).
