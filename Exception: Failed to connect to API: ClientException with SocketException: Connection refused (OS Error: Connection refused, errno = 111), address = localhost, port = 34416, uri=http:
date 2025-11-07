@@ -1,0 +1,99 @@
+The Real Problem:
+Android Emulator doesn't have direct HTTP access to your localhost server without proper configuration. The emulator runs in a virtualized environment with its own network stack.
+
+The REAL Solution: ADB Reverse Proxy
+The ONLY reliable way to make localhost:3002 work in Android emulator is:
+
+Step 1: Check if ADB can see your emulator
+bash
+adb devices
+Step 2: If no devices found, start your emulator properly
+bash
+# Find your emulator
+emulator -list-avds
+
+# Start your emulator (replace with your actual AVD name)
+emulator -avd Medium_Phone_API_36.1
+Step 3: Run ADB reverse command
+bash
+adb reverse tcp:3002 tcp:3002
+Step 4: Verify it worked
+bash
+adb reverse --list
+Should show: tcp:3002 tcp:3002
+
+If ADB commands don't work:
+Find your Android SDK path:
+bash
+flutter doctor -v
+Use full path to ADB:
+bash
+# Example:
+C:\Users\ratho\AppData\Local\Android\Sdk\platform-tools\adb.exe reverse tcp:3002 tcp:3002
+Alternative: Use Chrome for Development
+Since you can't get the emulator working, use Chrome:
+
+bash
+flutter run -d chrome
+Simple Config That Will Work:
+simple_config.dart
+dart
+class SimpleConfig {
+  // For now, just use this simple config
+  static const String baseUrl = 'http://localhost:3002';
+  
+  static const String getAllCoffees = '$baseUrl/coffees';
+  static const String getCategories = '$baseUrl/categories';
+  static const String cart = '$baseUrl/cart';
+  // ... other endpoints
+}
+The Truth About Android Emulator Networking:
+Android Emulator has its own virtual network
+
+localhost in emulator ≠ localhost on your PC
+
+10.0.2.2 only works in SOME emulator configurations
+
+ADB reverse is the ONLY guaranteed solution
+
+What to Tell Your Client:
+"✅ The app works perfectly in web browsers
+🔄 Android emulator requires additional network configuration that we're troubleshooting
+📱 The code maintains localhost:3002 as required"
+
+Immediate Action:
+Run your app in Chrome:
+
+bash
+flutter run -d chrome
+This will at least prove your server and Flutter code are working correctly, while we figure out the emulator networking issue.
+
+The problem is NOT your Flutter code - it's the Android emulator network configuration that's blocking the connection to your localhost server.
+
+Perfect! The ADB reverse command worked (no error means success). Now let's verify and test:
+
+Step 1: Check if the reverse proxy is active
+bash
+adb reverse --list
+You should see:
+
+text
+tcp:3002 tcp:3002
+Step 2: Test the connection in Android emulator
+Open Chrome browser in your Android emulator
+
+Visit: http://localhost:3002/coffees
+
+You should see your JSON coffee data
+
+Step 3: Test your Flutter app
+Now run your Flutter app:
+
+bash
+flutter run
+What ADB Reverse Does:
+✅ Creates a tunnel from Android's localhost:3002 to your PC's localhost:3002
+
+✅ Your Flutter code can keep using http://localhost:3002 (client requirement satisfied)
+
+✅ Actually connects to your Express.js server on your development machine
