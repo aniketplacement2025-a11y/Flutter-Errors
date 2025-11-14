@@ -1,0 +1,159 @@
+This is a different issue - there's a file lock preventing Flutter from updating the Dart SDK. Let's fix this step by step.
+
+Solution: Fix File Lock Issue
+1. Close All Running Applications
+First, close all applications that might be using Flutter or Dart:
+
+Close Android Studio/VS Code
+
+Close any running emulators
+
+Close any command prompts/powershell windows
+
+Stop any flutter run processes
+
+2. Kill Dart Processes in Task Manager
+Press Ctrl + Shift + Esc to open Task Manager and end these processes if running:
+
+dart.exe
+
+flutter.exe
+
+Any Java-related processes
+
+Any Android-related processes
+
+3. Manual Cleanup
+Open a new Command Prompt or PowerShell as Administrator and run:
+
+cmd
+# Navigate to your project
+cd "C:\Users\ratho\Desktop\Flutter Projects\Custom Notification\local_notifications"
+
+# Kill any dart processes
+taskkill /f /im dart.exe 2>nul
+taskkill /f /im flutter.exe 2>nul
+
+# Clean flutter
+flutter clean
+4. If Still Having Issues, Manual Dart SDK Cleanup
+cmd
+# Navigate to Flutter directory
+cd "C:\Users\ratho\Desktop\Flutter Setup\flutter"
+
+# Delete the dart-sdk folder manually
+rmdir /s /q bin\cache\dart-sdk
+
+# Then try flutter doctor
+flutter doctor
+5. Alternative: Use PowerShell Commands
+Open PowerShell as Administrator and run:
+
+powershell
+# Stop all Dart/Flutter processes
+Get-Process -Name "dart" -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process -Name "flutter" -ErrorAction SilentlyContinue | Stop-Process -Force
+
+# Navigate to project
+cd "C:\Users\ratho\Desktop\Flutter Projects\Custom Notification\local_notifications"
+
+# Clean and rebuild
+flutter clean
+flutter pub get
+6. Complete Reset Approach
+If the above doesn't work, try this complete reset:
+
+cmd
+# Close ALL applications first
+
+# Open CMD as Administrator
+cd C:\
+
+# Kill all possible conflicting processes
+taskkill /f /im dart.exe 2>nul
+taskkill /f /im flutter.exe 2>nul
+taskkill /f /im java.exe 2>nul
+taskkill /f /im javaw.exe 2>nul
+
+# Wait a moment
+timeout /t 5
+
+# Navigate to Flutter and clean cache
+cd "C:\Users\ratho\Desktop\Flutter Setup\flutter"
+rmdir /s /q bin\cache
+
+# Go to project and clean
+cd "C:\Users\ratho\Desktop\Flutter Projects\Custom Notification\local_notifications"
+flutter clean
+flutter pub get
+7. Check for Antivirus Interference
+Sometimes antivirus software can lock files. Temporarily:
+
+Disable real-time protection
+
+Add Flutter folder to exclusions
+
+Try the commands again
+
+8. Reboot Your Computer
+If nothing else works:
+
+Save all your work
+
+Reboot your computer
+
+Try running flutter doctor first
+
+Then try flutter run
+
+9. After Fixing the File Lock
+Once you can run Flutter again, use this simplified android/app/build.gradle.kts:
+
+kotlin
+plugins {
+    id("com.android.application")
+    id("kotlin-android")
+}
+
+android {
+    compileSdk = 34
+    namespace = "com.example.local_notifications"
+
+    compileOptions {
+        isCoreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    defaultConfig {
+        applicationId = "com.example.local_notifications"
+        minSdk = 21
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+    }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+}
+Steps to Try in Order:
+First: Close all apps and run flutter clean
+
+If that fails: Use Task Manager to kill dart/flutter processes
+
+If still failing: Reboot computer and try again
+
+Finally: Use the manual deletion approach
+
+The file lock is usually caused by:
+
+Another Flutter/Dart process running
+
+IDE holding onto files
+
+Antivirus software interference
+
+Windows file system caching
+
+Try the simplest solutions first (closing apps) before moving to more aggressive approaches.
