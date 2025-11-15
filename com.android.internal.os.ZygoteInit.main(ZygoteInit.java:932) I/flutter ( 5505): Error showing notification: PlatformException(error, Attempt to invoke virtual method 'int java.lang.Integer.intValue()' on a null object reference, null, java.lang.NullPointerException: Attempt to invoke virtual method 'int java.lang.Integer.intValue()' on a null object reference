@@ -1,0 +1,157 @@
+The issue is in your main.dart file. You have a bug in the initialization settings assignment. Here's the corrected code:
+
+Problem in Your Code:
+You're creating InitializationSettings twice and not assigning it properly:
+
+dart
+InitializationSettings initalizationSettings = InitializationSettings(); // ❌ WRONG
+InitializationSettings( // This line does nothing - it's not assigned to anything
+    android: androidSettings,
+    iOS: iosSettings
+);
+Corrected main.dart:
+dart
+import 'dart:developer';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:local_notifications/screens/home_screen.dart';
+
+FlutterLocalNotificationsPlugin notificationPlugin =
+    FlutterLocalNotificationsPlugin();
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  /*
+   When U went To Work with 'Time Zone Scheduling' then we import
+   below function And import 'package:timezone/data/latest_10y.dart':
+    initializeTimeZones();
+   */
+
+  // Run heavy initialization in a separate isolate or use Future.delayed
+  Future.delayed(Duration.zero, () async {
+    // Android Initialization
+    AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher'); // Use your app icon
+
+    // iOS initialization (if needed)
+    DarwinInitializationSettings iosSettings =
+        DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestCriticalPermission: true,
+      requestSoundPermission: true,
+    );
+
+    // ✅ CORRECTED: Properly assign the initialization settings
+    InitializationSettings initializationSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings
+    );
+
+    bool? initialized = await notificationPlugin.initialize(
+        initializationSettings, // ✅ Use the correctly assigned variable
+        onDidReceiveNotificationResponse: (NotificationResponse response){
+          print('Notification tapped!');
+        }
+    );
+
+    log("Notifications: $initialized");
+  });
+
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+     debugShowCheckedModeBanner: false,
+     home: HomeScreen(),
+    );
+  }
+}
+Also, improve your home_screen.dart:
+dart
+import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:local_notifications/main.dart';
+
+class HomeScreen extends StatefulWidget{
+  const HomeScreen({super.key});
+  
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+
+  void showNotification() async{
+    AndroidNotificationDetails androidDetails = 
+        AndroidNotificationDetails(
+            "demo-notification-aniket",
+            "Notifications Aniket",
+            channelDescription: 'It\'s Demo Description To Test Notification',
+            priority: Priority.max,
+            importance: Importance.max,
+            ticker: 'ticker'
+            // ✅ REMOVED: largeIcon is optional and might cause issues
+        );
+
+    DarwinNotificationDetails iosDetails =
+        DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        );
+
+    NotificationDetails notiDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails
+    );
+ 
+    try {
+      await notificationPlugin.show(
+        0, //Notification ID
+        "Sample Notification Title",
+        "This is Notification Body",
+        notiDetails,
+      );
+      print("Notification shown successfully");
+    } catch (e){
+      print('Error showing notification: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context){
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Local Notifications Demo'),
+      ),
+      floatingActionButton: FloatingActionButton(
+          onPressed: showNotification,
+          child: Icon(Icons.notification_add),
+      ),
+      body: SafeArea(
+        child: Center(
+          child: Text(
+            'Press the button to show notification',
+            style: TextStyle(fontSize: 18),
+          ),
+        ),
+      ),
+    );
+  }
+}
+Key Changes Made:
+Fixed initialization settings assignment in main.dart
+
+Removed the problematic largeIcon from Android notification details
+
+Added a simple UI with AppBar and centered text for better user experience
+
+Ensured proper variable naming and assignment
