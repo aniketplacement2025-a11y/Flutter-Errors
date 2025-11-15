@@ -1,0 +1,176 @@
+The issue is that the notification is being created but not showing up visibly. This is a common problem with Android emulators. Let's troubleshoot step by step:
+
+1. Check Notification Channel Importance
+The most common issue is that the channel importance is set too low. Let's modify your home_screen.dart:
+
+dart
+void showNotification() async{
+    AndroidNotificationDetails androidDetails = 
+        AndroidNotificationDetails(
+            "demo-notification-aniket",
+            "Notifications Aniket",
+            channelDescription: 'It\'s Demo Description To Test Notification',
+            priority: Priority.high, // Changed from max to high
+            importance: Importance.high, // Changed from max to high
+            playSound: true, // Add sound
+            enableVibration: true, // Add vibration
+            visibility: NotificationVisibility.public, // Make it visible everywhere
+        );
+
+    DarwinNotificationDetails iosDetails =
+        DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        );
+
+    NotificationDetails notiDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails
+    );
+ 
+    try {
+      await notificationPlugin.show(
+        0, //Notification ID
+        "Sample Notification Title",
+        "This is Notification Body",
+        notiDetails,
+      );
+      print("Notification shown successfully");
+    } catch (e){
+      print('Error showing notification: $e');
+    }
+  }
+2. Check Android Notification Settings
+In your emulator:
+
+Go to Settings > Apps & notifications > Notifications
+
+Check if your app has notification permission enabled
+
+Make sure "Do Not Disturb" mode is turned off
+
+3. Verify Notification Channel Creation
+Add this function to check if your channel is properly created:
+
+dart
+void checkNotificationSettings() async {
+  try {
+    // Check if notifications are enabled
+    bool? result = await notificationPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.areNotificationsEnabled();
+    
+    print("Notifications enabled: $result");
+    
+    // List all notification channels
+    var channels = await notificationPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.getNotificationChannels();
+    
+    print("Available channels: $channels");
+  } catch (e) {
+    print("Error checking notification settings: $e");
+  }
+}
+Call this function in your initState:
+
+dart
+@override
+void initState() {
+  super.initState();
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    checkNotificationSettings();
+  });
+}
+4. Alternative: Create Notification Channel Separately
+Sometimes creating the channel explicitly helps:
+
+dart
+void createNotificationChannel() async {
+  final android = AndroidFlutterLocalNotificationsPlugin();
+  
+  await android.createNotificationChannel(AndroidNotificationChannel(
+    'demo-notification-aniket',
+    'Notifications Aniket',
+    description: 'It\'s Demo Description To Test Notification',
+    importance: Importance.high,
+    playSound: true,
+  ));
+}
+Call this in your initState before showing notifications.
+
+5. Test with Simple Notification First
+Try this minimal version:
+
+dart
+void showSimpleNotification() async {
+  try {
+    await notificationPlugin.show(
+      0,
+      'Test Title',
+      'Test Body',
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          'basic_channel',
+          'Basic Channel',
+          channelDescription: 'Basic notifications',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+      ),
+    );
+    print("Simple notification shown");
+  } catch (e) {
+    print('Error: $e');
+  }
+}
+6. Check Emulator Settings
+Swipe down from the top of the emulator screen to see the notification panel
+
+Make sure the emulator is not in "Do Not Disturb" mode
+
+Check if notifications are muted in the emulator settings
+
+7. Debug Steps
+Add this debug code to see what's happening:
+
+dart
+void debugNotification() async {
+  print("Starting notification...");
+  
+  var android = AndroidNotificationDetails(
+    'debug_channel',
+    'Debug Channel',
+    channelDescription: 'For debugging',
+    importance: Importance.high,
+    priority: Priority.high,
+    playSound: true,
+  );
+  
+  var details = NotificationDetails(android: android);
+  
+  print("Showing notification with details: $details");
+  
+  try {
+    await notificationPlugin.show(
+      999, 
+      'DEBUG TITLE',
+      'DEBUG BODY - You should see this!',
+      details,
+    );
+    print("✅ Notification show() completed without error");
+  } catch (e) {
+    print("❌ Error: $e");
+  }
+}
+8. Restart the Emulator
+Sometimes the emulator notification system gets stuck:
+
+Close the emulator
+
+Start a fresh emulator instance
+
+Run your app again
+
+Try these steps in order and let me know what the debug output shows. The most likely issue is the notification channel importance or emulator notification settings.
